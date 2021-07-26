@@ -42,14 +42,16 @@ async function findBufFromName(denops: Denops, name: string): Promise<number> {
 }
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
-  if (await denops.eval("has('nvim')") as number == 1) {
+  if (await denops.eval("has('nvim')") as boolean) {
     const bufnr = await denops.call("nvim_create_buf", false, true);
     ensureNumber(bufnr);
     return bufnr;
     // Promise.resolve(bufnr);
   } else {
     // execute(denops, `badd popup`);
+    const currentBufnr = await denops.call("bufnr", "%") as number;
     await baddWithNofile(denops, "popup");
+    await denops.call("buffer", currentBufnr);
     return findBufFromName(denops, "popup");
     // how to get it in vim ?
     // return = -1;
