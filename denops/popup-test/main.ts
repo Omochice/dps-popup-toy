@@ -22,12 +22,20 @@ async function makeEmptyBuffer(denops: Denops): Promise<number> {
   }
 }
 
+async function closeCmd(denops: Denops, winid: number): Promise<string> {
+  if (await denops.eval("has('nvim')") as boolean) {
+    return `nvim_win_close(${winid}, v:false)`;
+  } else {
+    return `popup_close(${winid})`;
+  }
+}
+
 export async function main(denops: Denops): Promise<void> {
   denops.dispatcher = {
-    async dpsTest(text: unknown): Promise<unknown> {
-      ensureString(text);
+    async dpsTest(): Promise<void> {
       const currentBufnr = await denops.call("bufnr", "%");
       ensureNumber(currentBufnr);
+
       const opts = {
         relative: "editor",
         row: 1,
@@ -35,57 +43,38 @@ export async function main(denops: Denops): Promise<void> {
         width: 20,
         height: 20,
         border: true,
-      };
+      }; // sample option
 
-      // let bufnr: unknown; //empty buffer
       const bufnr = await makeEmptyBuffer(denops);
-
-      console.log(bufnr);
       ensureNumber(bufnr);
 
-      await execute(
-        denops,
-        `
-        augroup dps_float_close
-          autocmd! dps_float_close CursorMoved,CursorMovedI,VimResized *
-          autocmd CursorMoved,CursorMovedI,VimResized * echo "hello"
-        augroup END
-        `,
-      );
-      // equal as below ?
-      // now below is not work
+      const popupWinId = await popup.open(denops, bufnr, opts);
+      ensureNumber(popupWinId);
 
-      // await autocmd.define(
-      //   denops,
-      //   [
-      //     "CursorMoved",
-      //     "CursorMovedI",
-      //     "VimResized",
-      //   ],
-      //   "*",
-      //   "echo 'enter'",
-      //   { group: "dps_float_close" },
-      // );
-      //
-      const popupId = await popup.open(denops, bufnr, opts, {
-        onClose: async () => {
-          await autocmd.remove(
-            denops,
-            ["CursorMoved", "CursorMovedI", "VimResized"],
-            "*",
-            { group: "dps_float_close" },
-          );
-        },
+      await denops.call("setbufline", bufnr, 1, ["hello", "world"]);
+
+      const cmd = await closeCmd(denops, popupWinId);
+      // console.log(cmd);
+
+      await autocmd.group(denops, "dps_float_close", (helper) => {
+        helper.remove(
+          ["CursorMoved", "CursorMovedI", "VimResized"],
+          "*",
+        );
+        helper.define(
+          ["CursorMoved", "CursorMovedI", "VimResized"],
+          "*",
+          `call ${cmd}`,
+          { once: true },
+        );
       });
 
-      console.log(popupId);
-      await denops.call("setbufline", bufnr, 1, ["hello", "world"]);
       return await Promise.resolve();
     },
   };
 
   await execute(
     denops,
-    `command! -nargs=* DpsTest call denops#request('${denops.name}', 'dpsTest', [<q-args>])`,
+    `command! DpsTest call denops#request('${denops.name}', 'dpsTest', [])`,
   );
 }
