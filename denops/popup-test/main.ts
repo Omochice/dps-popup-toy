@@ -56,6 +56,9 @@ export async function main(denops: Denops): Promise<void> {
       const cmd = await closeCmd(denops, popupWinId);
       // console.log(cmd);
 
+      const row = await denops.call("line", ".");
+      const vcol = await denops.call("virtcol", ".");
+
       await autocmd.group(denops, "dps_float_close", (helper) => {
         helper.remove(
           ["CursorMoved", "CursorMovedI", "VimResized"],
@@ -64,8 +67,7 @@ export async function main(denops: Denops): Promise<void> {
         helper.define(
           ["CursorMoved", "CursorMovedI", "VimResized"],
           "*",
-          `call ${cmd}`,
-          { once: true },
+          `if (line('.') != ${row} || virtcol('.') != ${vcol}) | call ${cmd} | augroup dps_float_close | autocmd! | augroup END | endif`,
         );
       });
 
