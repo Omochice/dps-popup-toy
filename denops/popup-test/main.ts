@@ -8,7 +8,7 @@ import {
 import * as popup from "https://deno.land/x/denops_popup@v2.0.1/mod.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
-  if (await denops.eval("has('nvim')") as boolean) {
+  if (await denops.meta.host === "nvim") {
     const bufnr = await denops.call("nvim_create_buf", false, true);
     ensureNumber(bufnr);
     return bufnr;
@@ -23,7 +23,7 @@ async function makeEmptyBuffer(denops: Denops): Promise<number> {
 }
 
 async function closeCmd(denops: Denops, winid: number): Promise<string> {
-  if (await denops.eval("has('nvim')") as boolean) {
+  if (await denops.meta.host === "nvim") {
     return `nvim_win_close(${winid}, v:false)`;
   } else {
     return `popup_close(${winid})`;
