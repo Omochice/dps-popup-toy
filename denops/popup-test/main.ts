@@ -1,10 +1,7 @@
 import { Denops } from "https://deno.land/x/denops_std@v1.0.0/mod.ts";
 import { execute } from "https://deno.land/x/denops_std@v1.0.0/helper/mod.ts";
 import * as autocmd from "https://deno.land/x/denops_std@v1.0.0/autocmd/mod.ts";
-import {
-  ensureNumber,
-  ensureString,
-} from "https://deno.land/x/unknownutil@v1.0.0/mod.ts";
+import { ensureNumber } from "https://deno.land/x/unknownutil@v1.0.0/mod.ts";
 import * as popup from "https://deno.land/x/denops_popup@v2.0.1/mod.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
