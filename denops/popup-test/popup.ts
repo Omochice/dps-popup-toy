@@ -33,14 +33,14 @@ export async function openPopup(
   const vcol = await denops.call("virtcol", ".");
   ensureNumber(row);
   ensureNumber(vcol);
-  if (typeof (style) === "undefined") {
+  if (style == undefined) {
     style = {
       row: 1,
       col: vcol,
-      width: typeof content === "string"
-        ? content.length
-        : Math.max(...content.map((x) => x.length)),
-      height: typeof content === "string" ? 1 : content.length,
+      width: Array.isArray(content)
+        ? Math.max(...content.map((x) => x.length))
+        : content.length,
+      height: Array.isArray(content) ? content.length : 1,
       border: true,
     };
   }
