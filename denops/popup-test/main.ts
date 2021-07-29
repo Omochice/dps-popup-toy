@@ -5,7 +5,7 @@ import { ensureNumber } from "https://deno.land/x/unknownutil@v1.0.0/mod.ts";
 import * as popup from "https://deno.land/x/denops_popup@v2.0.1/mod.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
-  if (await denops.meta.host === "nvim") {
+  if (denops.meta.host === "nvim") {
     const bufnr = await denops.call("nvim_create_buf", false, true);
     ensureNumber(bufnr);
     return bufnr;
@@ -19,8 +19,8 @@ async function makeEmptyBuffer(denops: Denops): Promise<number> {
   }
 }
 
-async function closeCmd(denops: Denops, winid: number): Promise<string> {
-  if (await denops.meta.host === "nvim") {
+function closeCmd(denops: Denops, winid: number): string {
+  if (denops.meta.host === "nvim") {
     return `nvim_win_close(${winid}, v:false)`;
   } else {
     return `popup_close(${winid})`;
@@ -52,7 +52,7 @@ async function openPopup(
   // await denops.call("setbufline", bufnr, 1, ["hello", "world"]);
 
   if (autoclose) {
-    const cmd = await closeCmd(denops, popupWinId);
+    const cmd = closeCmd(denops, popupWinId);
     const row = await denops.call("line", ".");
     const vcol = await denops.call("virtcol", ".");
 
