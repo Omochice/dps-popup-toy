@@ -6,7 +6,7 @@ async function makeEmptyBuffer(denops: Denops): Promise<number> {
     ensureNumber(bufnr);
     return bufnr;
   } else {
-    const name = "dps-popup-test://popup";
+    const name = `${denops.name}://popup`;
     await execute(denops, `badd ${name}`);
     const bufnr = await denops.call("bufnr", `^${name}$`);
     ensureNumber(bufnr);
