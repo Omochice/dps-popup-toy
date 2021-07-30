@@ -33,13 +33,23 @@ export async function openPopup(
   const vcol = await denops.call("virtcol", ".");
   ensureNumber(row);
   ensureNumber(vcol);
+  // if inclode double width characters(ex. japanese),
+  // string.length not work well
+  let maxwidth = content.length;
+  if (Array.isArray(content)) {
+    for (const line of content) {
+      maxwidth = Math.max(
+        maxwidth,
+        await denops.call("strdisplaywidth", line) as number,
+      );
+    }
+  }
+
   if (style == undefined) {
     style = {
       row: 1,
       col: vcol,
-      width: Array.isArray(content)
-        ? Math.max(...content.map((x) => x.length))
-        : content.length,
+      width: maxwidth,
       height: Array.isArray(content) ? content.length : 1,
       border: true,
     };
