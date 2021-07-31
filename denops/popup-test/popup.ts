@@ -33,6 +33,12 @@ export async function openPopup(
   const vcol = await denops.call("virtcol", ".");
   ensureNumber(row);
   ensureNumber(vcol);
+
+  const screenrow = await denops.call("screenrow");
+  const screencol = await denops.call("screencol");
+  ensureNumber(screenrow);
+  ensureNumber(screencol);
+
   // if inclode double width characters(ex. japanese),
   // string.length not work well
   let maxwidth = content.length;
@@ -47,8 +53,10 @@ export async function openPopup(
 
   if (style == undefined) {
     style = {
-      row: 1,
-      col: vcol,
+      // row: 1,
+      // col: vcol,
+      row: screenrow,
+      col: screencol - vcol,
       width: maxwidth,
       height: Array.isArray(content) ? content.length : 1,
       border: true,

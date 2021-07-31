@@ -12,6 +12,9 @@ export async function main(denops: Denops): Promise<void> {
 
   await execute(
     denops,
-    `command! DpsTest call denops#request('${denops.name}', 'dpsTest', [])`,
+    `
+    command! DpsTest call denops#request('${denops.name}', 'dpsTest', [])
+    nnoremap <silent> <Plug>(DpsTest) <Cmd>DpsTest<CR>
+    `,
   );
 }
