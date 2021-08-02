@@ -1,4 +1,12 @@
-import { autocmd, Denops, ensureNumber, execute, popup } from "./deps.ts";
+import {
+  autocmd,
+  Denops,
+  ensureArray,
+  ensureNumber,
+  execute,
+  isNumber,
+  popup,
+} from "./deps.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
   if (denops.meta.host === "nvim") {
@@ -23,16 +31,23 @@ function closeCmd(denops: Denops, winid: number): string {
   }
 }
 
+async function bufnrToWinId(denops: Denops, bufnr: number): Promise<number> {
+  const wins = await denops.call("win_findbuf", bufnr);
+  ensureArray(wins, isNumber);
+  const tabnr = await denops.call("tabpagenr");
+  ensureNumber(tabnr);
+  const winIds =
+    (await denops.call("map", wins, "win_id2tabwin(v:val)") as number[][])
+      .filter((x) => x[0] == tabnr);
+  return winIds[0][1];
+}
+
 export async function openPopup(
   denops: Denops,
   content: string | string[],
   autoclose = false,
   style?: popup.PopupWindowStyle,
 ): Promise<void> {
-  const row = await denops.call("line", ".");
-  const vcol = await denops.call("virtcol", ".");
-  ensureNumber(row);
-  ensureNumber(vcol);
   // if inclode double width characters(ex. japanese),
   // string.length not work well
   let maxwidth = content.length;
@@ -45,24 +60,43 @@ export async function openPopup(
     }
   }
 
+  const bufnr = await denops.call("bufnr");
+  ensureNumber(bufnr);
+  const winid = await bufnrToWinId(denops, bufnr);
+  const winWidth = await denops.call("winwidth", winid);
+  ensureNumber(winWidth);
+
+  // on Vim, if popup protrude right, automove left
+  const screencol = await denops.call("screencol");
+  ensureNumber(screencol);
+  // +1 is right border
+  const over = (screencol + maxwidth + 1) - winWidth;
+  const col = over > 0 ? screencol - over : screencol;
+
+  const screenrow = await denops.call("screenrow");
+  ensureNumber(screenrow);
   if (style == undefined) {
     style = {
-      row: 1,
-      col: vcol,
+      row: screenrow,
+      col: col,
       width: maxwidth,
       height: Array.isArray(content) ? content.length : 1,
       border: true,
     };
   }
-  const bufnr = await makeEmptyBuffer(denops);
-  ensureNumber(bufnr);
+  const popupBufnr = await makeEmptyBuffer(denops);
+  ensureNumber(popupBufnr);
 
-  const popupWinId = await popup.open(denops, bufnr, style);
+  const popupWinId = await popup.open(denops, popupBufnr, style);
   ensureNumber(popupWinId);
 
-  await denops.call("setbufline", bufnr, 1, content);
+  await denops.call("setbufline", popupBufnr, 1, content);
 
   if (autoclose) {
+    const row = await denops.call("line", ".");
+    const vcol = await denops.call("virtcol", ".");
+    ensureNumber(row);
+    ensureNumber(vcol);
     const cmd = closeCmd(denops, popupWinId);
     await autocmd.group(denops, "dps_float_close", (helper) => {
       helper.remove(
@@ -76,5 +110,6 @@ export async function openPopup(
       );
     });
   }
+
   return await Promise.resolve();
 }
