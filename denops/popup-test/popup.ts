@@ -1,12 +1,4 @@
-import {
-  autocmd,
-  Denops,
-  ensureArray,
-  ensureNumber,
-  execute,
-  isNumber,
-  popup,
-} from "./deps.ts";
+import { autocmd, Denops, ensureNumber, execute, popup } from "./deps.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
   if (denops.meta.host === "nvim") {
@@ -31,17 +23,6 @@ function closeCmd(denops: Denops, winid: number): string {
   }
 }
 
-async function bufnrToWinId(denops: Denops, bufnr: number): Promise<number> {
-  const wins = await denops.call("win_findbuf", bufnr);
-  ensureArray(wins, isNumber);
-  const tabnr = await denops.call("tabpagenr");
-  ensureNumber(tabnr);
-  const winIds =
-    (await denops.call("map", wins, "win_id2tabwin(v:val)") as number[][])
-      .filter((x) => x[0] == tabnr);
-  return winIds[0][1];
-}
-
 export async function openPopup(
   denops: Denops,
   content: string | string[],
@@ -50,36 +31,34 @@ export async function openPopup(
 ): Promise<void> {
   // if inclode double width characters(ex. japanese),
   // string.length not work well
-  let maxwidth = content.length;
+  let contentMaxWidth = content.length;
   if (Array.isArray(content)) {
     for (const line of content) {
-      maxwidth = Math.max(
-        maxwidth,
+      contentMaxWidth = Math.max(
+        contentMaxWidth,
         await denops.call("strdisplaywidth", line) as number,
       );
     }
   }
 
-  const bufnr = await denops.call("bufnr");
-  ensureNumber(bufnr);
-  const winid = await bufnrToWinId(denops, bufnr);
-  const winWidth = await denops.call("winwidth", winid);
+  const winWidth = await denops.call("winwidth", ".");
   ensureNumber(winWidth);
 
   // on Vim, if popup protrude right, automove left
-  const screencol = await denops.call("screencol");
-  ensureNumber(screencol);
+  const winRow = await denops.call("winline");
+  const winCol = await denops.call("wincol");
+  ensureNumber(winRow);
+  ensureNumber(winCol);
   // +1 is right border
-  const over = (screencol + maxwidth + 1) - winWidth;
-  const col = over > 0 ? screencol - over : screencol;
+  const over = (winCol + contentMaxWidth + 1) - winWidth;
+  const col = over > 0 ? winCol - over : winCol;
 
-  const screenrow = await denops.call("screenrow");
-  ensureNumber(screenrow);
   if (style == undefined) {
     style = {
-      row: screenrow,
+      relative: "win",
+      row: winRow,
       col: col,
-      width: maxwidth,
+      width: contentMaxWidth,
       height: Array.isArray(content) ? content.length : 1,
       border: true,
     };
