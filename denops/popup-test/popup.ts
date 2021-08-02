@@ -48,16 +48,6 @@ export async function openPopup(
   autoclose = false,
   style?: popup.PopupWindowStyle,
 ): Promise<void> {
-  const row = await denops.call("line", ".");
-  const vcol = await denops.call("virtcol", ".");
-  ensureNumber(row);
-  ensureNumber(vcol);
-
-  const screenrow = await denops.call("screenrow");
-  const screencol = await denops.call("screencol");
-  ensureNumber(screenrow);
-  ensureNumber(screencol);
-
   // if inclode double width characters(ex. japanese),
   // string.length not work well
   let maxwidth = content.length;
@@ -75,26 +65,38 @@ export async function openPopup(
   const winid = await bufnrToWinId(denops, bufnr);
   const winWidth = await denops.call("winwidth", winid);
   ensureNumber(winWidth);
+
+  // on Vim, if popup protrude right, automove left
+  const screencol = await denops.call("screencol");
+  ensureNumber(screencol);
+  // +1 is right border
+  const over = (screencol + maxwidth + 1) - winWidth;
+  const col = over > 0 ? screencol - over : screencol;
+
+  const screenrow = await denops.call("screenrow");
+  ensureNumber(screenrow);
   if (style == undefined) {
     style = {
-      // row: 1,
-      // col: vcol,
       row: screenrow,
-      col: screencol - vcol,
+      col: col,
       width: maxwidth,
       height: Array.isArray(content) ? content.length : 1,
       border: true,
     };
   }
-  const bufnr = await makeEmptyBuffer(denops);
-  ensureNumber(bufnr);
+  const popupBufnr = await makeEmptyBuffer(denops);
+  ensureNumber(popupBufnr);
 
-  const popupWinId = await popup.open(denops, bufnr, style);
+  const popupWinId = await popup.open(denops, popupBufnr, style);
   ensureNumber(popupWinId);
 
-  await denops.call("setbufline", bufnr, 1, content);
+  await denops.call("setbufline", popupBufnr, 1, content);
 
   if (autoclose) {
+    const row = await denops.call("line", ".");
+    const vcol = await denops.call("virtcol", ".");
+    ensureNumber(row);
+    ensureNumber(vcol);
     const cmd = closeCmd(denops, popupWinId);
     await autocmd.group(denops, "dps_float_close", (helper) => {
       helper.remove(
@@ -108,5 +110,6 @@ export async function openPopup(
       );
     });
   }
+
   return await Promise.resolve();
 }
