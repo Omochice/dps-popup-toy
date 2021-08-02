@@ -1,4 +1,12 @@
-import { autocmd, Denops, ensureNumber, execute, popup } from "./deps.ts";
+import {
+  autocmd,
+  Denops,
+  ensureArray,
+  ensureNumber,
+  execute,
+  isNumber,
+  popup,
+} from "./deps.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
   if (denops.meta.host === "nvim") {
@@ -21,6 +29,17 @@ function closeCmd(denops: Denops, winid: number): string {
   } else {
     return `popup_close(${winid})`;
   }
+}
+
+async function bufnrToWinId(denops: Denops, bufnr: number): Promise<number> {
+  const wins = await denops.call("win_findbuf", bufnr);
+  ensureArray(wins, isNumber);
+  const tabnr = await denops.call("tabpagenr");
+  ensureNumber(tabnr);
+  const winIds =
+    (await denops.call("map", wins, "win_id2tabwin(v:val)") as number[][])
+      .filter((x) => x[0] == tabnr);
+  return winIds[0][1];
 }
 
 export async function openPopup(
@@ -51,6 +70,11 @@ export async function openPopup(
     }
   }
 
+  const bufnr = await denops.call("bufnr");
+  ensureNumber(bufnr);
+  const winid = await bufnrToWinId(denops, bufnr);
+  const winWidth = await denops.call("winwidth", winid);
+  ensureNumber(winWidth);
   if (style == undefined) {
     style = {
       // row: 1,
