@@ -1,4 +1,4 @@
-import { autocmd, Denops, ensureNumber, execute, popup } from "./deps.ts";
+import { autocmd, Denops, ensureNumber, execute, popup, vars } from "./deps.ts";
 
 async function makeEmptyBuffer(denops: Denops): Promise<number> {
   if (denops.meta.host === "nvim") {
@@ -23,38 +23,58 @@ function closeCmd(denops: Denops, winid: number): string {
   }
 }
 
+export type PopupConfig = {
+  style?: popup.PopupWindowStyle;
+  underCursor?: boolean;
+  autoclose?: boolean;
+};
+
 export async function openPopup(
   denops: Denops,
   content: string | string[],
-  autoclose = false,
-  style?: popup.PopupWindowStyle,
+  config: PopupConfig,
+  // autoclose = false,
+  // style?: popup.PopupWindowStyle,
 ): Promise<void> {
-  // if inclode double width characters(ex. japanese),
-  // string.length not work well
-  let contentMaxWidth = content.length;
-  if (Array.isArray(content)) {
-    for (const line of content) {
-      contentMaxWidth = Math.max(
-        contentMaxWidth,
-        await denops.call("strdisplaywidth", line) as number,
-      );
+  const plugName = denops.name.replaceAll("-", "_");
+  const isOpenedVarName = `${plugName}_is_popup_opened`;
+  if (config.autoclose) {
+    const isOpened = await vars.g.get(denops, isOpenedVarName, -1);
+    ensureNumber(isOpened);
+    if (isOpened != -1) {
+      await vars.g.set(denops, isOpenedVarName, -1);
+      try {
+        await denops.eval(closeCmd(denops, isOpened));
+      } catch (_) {
+        return Promise.resolve();
+      }
     }
   }
+  // if inclode double width characters(ex. japanese),
+  // string.length not work well
 
-  const winWidth = await denops.call("winwidth", ".");
-  ensureNumber(winWidth);
+  if (config.style == undefined || config.autoclose) {
+    let contentMaxWidth = content.length;
+    if (Array.isArray(content)) {
+      for (const line of content) {
+        contentMaxWidth = Math.max(
+          contentMaxWidth,
+          await denops.call("strdisplaywidth", line) as number,
+        );
+      }
+    }
+    const winWidth = await denops.call("winwidth", ".");
+    ensureNumber(winWidth);
 
-  // on Vim, if popup protrude right, automove left
-  const winRow = await denops.call("winline");
-  const winCol = await denops.call("wincol");
-  ensureNumber(winRow);
-  ensureNumber(winCol);
-  // +1 is right border
-  const over = (winCol + contentMaxWidth + 1) - winWidth;
-  const col = over > 0 ? winCol - over : winCol;
-
-  if (style == undefined) {
-    style = {
+    // on Vim, if popup protrude right, automove left
+    const winRow = await denops.call("winline");
+    const winCol = await denops.call("wincol");
+    ensureNumber(winRow);
+    ensureNumber(winCol);
+    // +1 is right border
+    const over = (winCol + contentMaxWidth + 1) - winWidth;
+    const col = over > 0 ? winCol - over : winCol;
+    config.style = {
       relative: "win",
       row: winRow,
       col: col,
@@ -66,18 +86,20 @@ export async function openPopup(
   const popupBufnr = await makeEmptyBuffer(denops);
   ensureNumber(popupBufnr);
 
-  const popupWinId = await popup.open(denops, popupBufnr, style);
+  const popupWinId = await popup.open(denops, popupBufnr, config.style);
   ensureNumber(popupWinId);
+  await vars.g.set(denops, isOpenedVarName, popupWinId);
 
   await denops.call("setbufline", popupBufnr, 1, content);
 
-  if (autoclose) {
+  if (config.autoclose) {
+    const augroupName = `${plugName}_popup_internal`;
     const row = await denops.call("line", ".");
     const vcol = await denops.call("virtcol", ".");
     ensureNumber(row);
     ensureNumber(vcol);
     const cmd = closeCmd(denops, popupWinId);
-    await autocmd.group(denops, "dps_float_close", (helper) => {
+    await autocmd.group(denops, augroupName, (helper) => {
       helper.remove(
         ["CursorMoved", "CursorMovedI", "VimResized"],
         "*",
@@ -85,7 +107,7 @@ export async function openPopup(
       helper.define(
         ["CursorMoved", "CursorMovedI", "VimResized"],
         "*",
-        `if (line('.') != ${row} || virtcol('.') != ${vcol}) | call ${cmd} | augroup dps_float_close | autocmd! | augroup END | endif`,
+        `if (line('.') != ${row} || virtcol('.') != ${vcol}) | call ${cmd} | let g:${isOpenedVarName} = -1 | augroup ${augroupName} | autocmd! | augroup END | endf`,
       );
     });
   }
