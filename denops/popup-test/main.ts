@@ -1,10 +1,11 @@
-import { Denops, execute } from "./deps.ts";
+import { Denops, ensureArray, execute, isString } from "./deps.ts";
 import { openPopup } from "./popup.ts";
 
 export async function main(denops: Denops): Promise<void> {
   denops.dispatcher = {
-    async dpsTest(): Promise<void> {
-      await openPopup(denops, ["hello", "denops!!"], true);
+    async dpsTest(...args: Array<unknown>): Promise<void> {
+      ensureArray(args, isString);
+      await openPopup(denops, args, { autoclose: true });
 
       return await Promise.resolve();
     },
@@ -13,8 +14,9 @@ export async function main(denops: Denops): Promise<void> {
   await execute(
     denops,
     `
-    command! DpsTest call denops#request('${denops.name}', 'dpsTest', [])
-    nnoremap <silent> <Plug>(DpsTest) <Cmd>DpsTest<CR>
+    let g:DpsPopupToy_strings = ["hello", "denops", "popup!!"]
+    command! DpsPopupToy call denops#request('${denops.name}', 'dpsTest', g:DpsPopupToy_strings)
+    nnoremap <silent> <Plug>(DpsTest) <Cmd>DpsPopupToy<CR>
     `,
   );
 }
