@@ -3,7 +3,7 @@ import { openPopup } from "./popup.ts";
 
 export async function main(denops: Denops): Promise<void> {
   denops.dispatcher = {
-    async dpsTest(...args: Array<unknown>): Promise<void> {
+    async show(...args: Array<unknown>): Promise<void> {
       ensureArray(args, isString);
       await openPopup(denops, args, { autoclose: true });
 
@@ -14,9 +14,9 @@ export async function main(denops: Denops): Promise<void> {
   await execute(
     denops,
     `
-    let g:DpsPopupToy_strings = ["hello", "denops", "popup!!"]
-    command! DpsPopupToy call denops#request('${denops.name}', 'dpsTest', g:DpsPopupToy_strings)
-    nnoremap <silent> <Plug>(DpsTest) <Cmd>DpsPopupToy<CR>
+    let g:popup_toy_strings = ["hello", "denops", "popup!!"]
+    command! DpsPopupToy call denops#request('${denops.name}', 'show', g:popup_toy_strings)
+    nnoremap <silent> <Plug>(popup_toy) <Cmd>DpsPopupToy<CR>
     `,
   );
 }
