@@ -27,6 +27,7 @@ export type PopupConfig = {
   style?: popup.PopupWindowStyle;
   underCursor?: boolean;
   autoclose?: boolean;
+  wrap?: boolean;
 };
 
 export async function openPopup(
@@ -91,6 +92,10 @@ export async function openPopup(
   await vars.g.set(denops, isOpenedVarName, popupWinId);
 
   await denops.call("setbufline", popupBufnr, 1, content);
+  if (typeof config.wrap == "boolean") {
+    const wrap = config.wrap ? 1 : 0;
+    await denops.call("setbufvar", popupBufnr, "&wrap", wrap);
+  }
 
   if (config.autoclose) {
     const augroupName = `${plugName}_popup_internal`;
