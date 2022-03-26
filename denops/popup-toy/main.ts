@@ -10,13 +10,5 @@ export async function main(denops: Denops): Promise<void> {
       return await Promise.resolve();
     },
   };
-
-  await execute(
-    denops,
-    `
-    let g:popup_toy_strings = ["hello", "denops", "popup!!"]
-    command! DpsPopupToy call denops#request('${denops.name}', 'show', g:popup_toy_strings)
-    nnoremap <silent> <Plug>(popup_toy) <Cmd>DpsPopupToy<CR>
-    `,
-  );
+  return await Promise.resolve();
 }
