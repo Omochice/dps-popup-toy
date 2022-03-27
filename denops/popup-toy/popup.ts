@@ -1,22 +1,7 @@
-import { autocmd, Denops, ensureNumber, execute, popup, vars } from "./deps.ts";
+import { autocmd, Denops, ensureNumber, fn, popup } from "./deps.ts";
 
-async function makeEmptyBuffer(denops: Denops): Promise<number> {
-  if (denops.meta.host === "nvim") {
-    const bufnr = await denops.call("nvim_create_buf", false, true);
-    ensureNumber(bufnr);
-    return bufnr;
-  } else {
-    const name = `${denops.name}://popup`;
-    await execute(denops, `badd ${name}`);
-    const bufnr = await denops.call("bufnr", `^${name}$`);
-    ensureNumber(bufnr);
-    await denops.call("setbufvar", bufnr, "&buftype", "nofile");
-    return bufnr;
-  }
-}
-
-function closeCmd(denops: Denops, winid: number): string {
-  if (denops.meta.host === "nvim") {
+function closeCmd(host: "vim" | "nvim", winid: number): string {
+  if (host == "nvim") {
     return `nvim_win_close(${winid}, v:false)`;
   } else {
     return `popup_close(${winid})`;
@@ -30,81 +15,67 @@ export type PopupConfig = {
   wrap?: boolean;
 };
 
-export async function openPopup(
-  denops: Denops,
-  content: string | string[],
-  config: PopupConfig,
-  // autoclose = false,
-  // style?: popup.PopupWindowStyle,
-): Promise<void> {
-  const plugName = denops.name.replaceAll("-", "_");
-  const isOpenedVarName = `${plugName}_is_popup_opened`;
-  if (config.autoclose) {
-    const isOpened = await vars.g.get(denops, isOpenedVarName, -1);
-    ensureNumber(isOpened);
-    if (isOpened != -1) {
-      await vars.g.set(denops, isOpenedVarName, -1);
-      try {
-        await denops.eval(closeCmd(denops, isOpened));
-      } catch (_) {
-        return Promise.resolve();
-      }
+type BorderStyle = {
+  topLeft: string;
+  top: string;
+  topRight: string;
+  right: string;
+  bottomRight: string;
+  bottom: string;
+  bottomLeft: string;
+  left: string;
+};
+
+type PopupOption = {
+  denops: Denops;
+  bufnr: number;
+  position: Position | "cursor";
+  size: { width: number; height: number };
+  autoclose?: boolean;
+  border?: BorderStyle | "none";
+};
+
+type Position = { row: number; col: number };
+
+export async function openPopup(option: PopupOption): Promise<number> {
+  const position: Position = { row: 0, col: 0 };
+  if (option.position == "cursor") {
+    const winline = await fn.winline(option.denops);
+    const wincol = await fn.wincol(option.denops);
+    const winwidth = ensureNumber(await fn.winwidth(option.denops, "."));
+    const borderWidth = option.border == "none" ? 0 : 2;
+    const contentWidth = option.size.width;
+    const expectedPopupWidth = contentWidth + borderWidth;
+    // if popup is over than window, shift popup to left
+    if (wincol + expectedPopupWidth > winwidth) {
+      const col = Math.max(1, winwidth - expectedPopupWidth);
+      position.row = winline;
+      position.col = col;
+    } else {
+      position.row = winline;
+      position.col = wincol;
     }
-  }
-  // if inclode double width characters(ex. japanese),
-  // string.length not work well
-
-  if (config.style == undefined || config.autoclose) {
-    let contentMaxWidth = content.length;
-    if (Array.isArray(content)) {
-      for (const line of content) {
-        contentMaxWidth = Math.max(
-          contentMaxWidth,
-          await denops.call("strdisplaywidth", line) as number,
-        );
-      }
-    }
-    const winWidth = await denops.call("winwidth", ".");
-    ensureNumber(winWidth);
-
-    // on Vim, if popup protrude right, automove left
-    const winRow = await denops.call("winline");
-    const winCol = await denops.call("wincol");
-    ensureNumber(winRow);
-    ensureNumber(winCol);
-    // +1 is right border
-    const over = (winCol + contentMaxWidth + 1) - winWidth;
-    const col = over > 0 ? winCol - over : winCol;
-    config.style = {
-      relative: "win",
-      row: winRow,
-      col: col,
-      width: contentMaxWidth,
-      height: Array.isArray(content) ? content.length : 1,
-      border: true,
-    };
-  }
-  const popupBufnr = await makeEmptyBuffer(denops);
-  ensureNumber(popupBufnr);
-
-  const popupWinId = await popup.open(denops, popupBufnr, config.style);
-  ensureNumber(popupWinId);
-  await vars.g.set(denops, isOpenedVarName, popupWinId);
-
-  await denops.call("setbufline", popupBufnr, 1, content);
-  if (typeof config.wrap == "boolean") {
-    const wrap = config.wrap ? 1 : 0;
-    await denops.call("setbufvar", popupBufnr, "&wrap", wrap);
+  } else {
+    position.row = option.position.row;
+    position.col = option.position.col;
   }
 
-  if (config.autoclose) {
-    const augroupName = `${plugName}_popup_internal`;
-    const row = await denops.call("line", ".");
-    const vcol = await denops.call("virtcol", ".");
-    ensureNumber(row);
-    ensureNumber(vcol);
-    const cmd = closeCmd(denops, popupWinId);
-    await autocmd.group(denops, augroupName, (helper) => {
+  const config: popup.PopupWindowStyle = {
+    row: position.row,
+    col: position.col,
+    width: option.size.width,
+    height: option.size.height,
+    border: option.border,
+  };
+
+  const winid = await popup.open(option.denops, option.bufnr, config);
+
+  if (option.autoclose == true) { // t/f/undefined
+    const row = await fn.line(option.denops, ".");
+    const vcol = await fn.virtcol(option.denops, ".");
+    const cmd = closeCmd(option.denops.meta.host, winid);
+    const augroupName = "dps_popup_test_internal";
+    await autocmd.group(option.denops, augroupName, (helper) => {
       helper.remove(
         ["CursorMoved", "CursorMovedI", "VimResized"],
         "*",
@@ -112,10 +83,9 @@ export async function openPopup(
       helper.define(
         ["CursorMoved", "CursorMovedI", "VimResized"],
         "*",
-        `if (line('.') != ${row} || virtcol('.') != ${vcol}) | call ${cmd} | let g:${isOpenedVarName} = -1 | augroup ${augroupName} | autocmd! | augroup END | endf`,
+        `if (line('.') != ${row} || virtcol('.') != ${vcol}) | call ${cmd} | augroup ${augroupName} | autocmd! | augroup END | endif`,
       );
     });
   }
-
-  return await Promise.resolve();
+  return Promise.resolve(winid);
 }
