@@ -1,11 +1,4 @@
-import {
-  Denops,
-  ensureArray,
-  ensureNumber,
-  fn,
-  isString,
-  vars,
-} from "./deps.ts";
+import { Denops, ensure, fn, is, vars } from "./deps.ts";
 import { openPopup } from "./popup.ts";
 
 export async function main(denops: Denops): Promise<void> {
@@ -13,13 +6,18 @@ export async function main(denops: Denops): Promise<void> {
     async show(...args: Array<unknown>): Promise<void> {
       const bufnr = await fn.bufnr(denops, "dps_popup_test_string", true);
       await fn.bufload(denops, bufnr);
-      await fn.setbufline(denops, bufnr, 1, ensureArray(args, isString));
+      await fn.setbufline(
+        denops,
+        bufnr,
+        1,
+        ensure(args, is.ArrayOf(is.String)),
+      );
       await fn.setbufvar(denops, bufnr, "&buftype", "nofile");
 
       const contentsWidths: number[] = [];
       for (const line of args) {
         contentsWidths.push(
-          ensureNumber(await fn.strdisplaywidth(denops, line)),
+          ensure(await fn.strdisplaywidth(denops, line), is.Number),
         );
       }
 

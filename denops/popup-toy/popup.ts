@@ -1,4 +1,4 @@
-import { autocmd, Denops, ensureNumber, fn, popup } from "./deps.ts";
+import { autocmd, Denops, ensure, fn, is, popup } from "./deps.ts";
 
 function closeCmd(host: "vim" | "nvim", winid: number): string {
   if (host == "nvim") {
@@ -42,7 +42,7 @@ export async function openPopup(option: PopupOption): Promise<number> {
   if (option.position == "cursor") {
     const winline = await fn.winline(option.denops);
     const wincol = await fn.wincol(option.denops);
-    const winwidth = ensureNumber(await fn.winwidth(option.denops, "."));
+    const winwidth = ensure(await fn.winwidth(option.denops, "."), is.Number);
     const borderWidth = option.border == "none" ? 0 : 2;
     const contentWidth = option.size.width;
     const expectedPopupWidth = contentWidth + borderWidth;
